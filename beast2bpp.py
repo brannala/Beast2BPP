@@ -1,30 +1,25 @@
-import xml.sax
+from xml.sax.handler import ContentHandler
+from xml.sax import parse
 
 noloci = 0
 maxNoSeqs = 0
 
-class BeastHandler ( xml.sax.ContentHandler ):
-    def __init__(self):
-        self.CurrentData = ""
-        self.type = ""
-        self.data = ""
-        self.format = ""
-        self.sequence = ""
-        self.year = ""
-        self.rating = ""
-        self.stars = ""
-        self.description = ""
-        self.title = ""
+class dataHandler(ContentHandler):
+    in_sequence = False
+
+    def __init__(self,sequence):
+        ContentHandler.__init__(self)
+        self.sequence = sequence
+        self.data = []
         self.firstcall = 0
-
-
-    # Call when an element starts
-    def startElement(self, tag, attributes):
+        self.title=""
+       
+    def startElement(self,name,attrs):
         global noloci
         global maxNoSeqs
-        self.CurrentData = tag
-        if tag == "data":
-            noseqs = attributes["id"]
+        self.data = name
+        if name == "data":
+            noseqs = attrs["id"]
             noloci+=1
             f.write('\n')
             f.write("  ")
@@ -32,16 +27,13 @@ class BeastHandler ( xml.sax.ContentHandler ):
             if int(noseqs) > maxNoSeqs:
                 maxNoSeqs=int(noseqs)
             self.firstcall=0
-        elif tag == "sequence":
-            self.title = attributes["taxon"]
-    # Call when an elements ends
-    def endElement(self, tag):
-        if self.CurrentData == "type":
-            print ("Type:", self.type)
-        elif self.CurrentData == "format":
-            print ("Format:", self.format)
-        elif self.CurrentData == "sequence":
-            astring=self.sequence
+        elif name == "sequence":
+            self.title = attrs["taxon"]
+            self.in_sequence = True
+
+    def endElement(self, name):
+        if name == "sequence":
+            astring=self.data
             a2=astring.strip()
             if self.firstcall==0:
                 a3=len(a2)
@@ -53,53 +45,50 @@ class BeastHandler ( xml.sax.ContentHandler ):
             f.write('\n')
             f.write(a2)
             f.write('\n')
-        elif self.CurrentData == "year":
-            print ("Year:", self.year)
-        elif self.CurrentData == "rating":
-            print ("Rating:", self.rating)
-        elif self.CurrentData == "stars":
-            print ("Stars:", self.stars)
-        elif self.CurrentData == "description":
-            print ("Description:", self.description)
-        self.CurrentData = ""
+            self.data = []
 
-    # Call when a character is read
-    def characters(self, content):
-
-        if self.CurrentData == "type":
-            self.type = content
-        elif self.CurrentData == "format":
-            self.format = content
-        elif self.CurrentData == "sequence":
-            self.sequence = content
-        elif self.CurrentData == "year": 
-            self.year = content
-        elif self.CurrentData == "rating":
-            self.rating = content
-        elif self.CurrentData == "stars":
-            self.stars = content
-        elif self.CurrentData == "description":
-            self.description = content
-
-if ( __name__ == "__main__"):
-
-    beast_xml_file = input("Enter Beast xml file name: ")
-    f = open("bpp.txt",'w')
-
-    # create an XMLReader
-    parser = xml.sax.make_parser()
-    # turn off namepsaces
-    parser.setFeature(xml.sax.handler.feature_namespaces, 0)
-
-    # override the default ContextHandler
-    Handler = BeastHandler()
-    parser.setContentHandler( Handler )
+    def characters(self,string):
+        if self.in_sequence:
+            self.data=string
+            
+class BeastHandler(ContentHandler):
+    in_taxonsuperset = False
+    currSpecies=''
+        
+    def startElement(self,name,attrs):
+        if name == 'taxonset':
+            if attrs["id"] == 'taxonsuperset':
+                self.in_taxonsuperset = True
+        if name == 'taxon':
+            if self.in_taxonsuperset:
+                if attrs["spec"] == 'TaxonSet':
+                    self.currSpecies=attrs["id"]
+                elif attrs["spec"] == 'Taxon':
+                    m.write(self.currSpecies)
+                    m.write("\t")
+                    m.write(attrs["id"])
+                    m.write("\n")
     
-    parser.parse(beast_xml_file)
-    print("File",beast_xml_file, "with", noloci, "loci and a maximum of",maxNoSeqs,"sequences per locus was successfully converting to BPP format.")
-    print("BPP files are named bpp.ctl, bpp.txt and bpp.map.")
+    def endElement(self, name):
+        if name == 'taxonset':
+            self.in_taxonsuperset = False
 
-    f.close()
+            
+sequence = []
+species = []
 
+beast_xml_file = input("Enter Beast xml file name: ")
+f = open("bpp.txt",'w')
+m = open("bpp.map",'w')
 
- 
+parse(beast_xml_file,dataHandler(sequence))
+print('The following sequences were found:')
+for h in sequence:
+    print(h)
+
+parse('examples/testStarBeast.xml',BeastHandler())
+print("File",beast_xml_file, "with", noloci, "loci and a maximum of",maxNoSeqs,"sequences per locus was successfully converting to BPP format.")
+print("BPP files are named bpp.ctl, bpp.txt and bpp.map.")
+f.close()
+m.close()
+    
