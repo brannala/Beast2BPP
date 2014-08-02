@@ -3,16 +3,40 @@ from xml.sax import parse
 
 noloci = 0
 nospecies = 0
+noseqs = []
 speciesNames = []
 maxIndivs = []
 maxNoSeqs = 0
 indivIndexMap = {}
 speciesTree = ''
 
+class noseqHandler(ContentHandler):
+    locusIndex = -1
+    currIndex = 0
+    
+    def __init__(self):
+        ContentHandler.__init__(self)
+        self.data = []
+        self.firstcall = 0
+        self.title=""
+    
+    def startElement(self,name,attrs):
+        global noseqs
+        self.data = name
+        if name == "data":
+            noseqs.append(0)
+            self.firstcall=0
+            self.locusIndex = self.locusIndex + 1
+        elif name == "sequence":
+            noseqs[self.locusIndex] = noseqs[self.locusIndex] + 1
+
+
 class dataHandler(ContentHandler):
     in_sequence = False
     nameIndex = 1
     currIndex = 0
+    locusIndex = -1
+
 
     def __init__(self,sequence):
         ContentHandler.__init__(self)
@@ -23,17 +47,18 @@ class dataHandler(ContentHandler):
        
     def startElement(self,name,attrs):
         global noloci
+        global noseqs
         global maxNoSeqs
         global indivIndexMap
         self.data = name
         if name == "data":
-            noseqs = attrs["id"]
+            self.locusIndex = self.locusIndex + 1
             noloci+=1
             f.write('\n')
             f.write("  ")
-            f.write(noseqs)
-            if int(noseqs) > maxNoSeqs:
-                maxNoSeqs=int(noseqs)
+            f.write(str(noseqs[self.locusIndex]))
+            if int(noseqs[self.locusIndex]) > maxNoSeqs:
+                maxNoSeqs=int(noseqs[self.locusIndex])
             self.firstcall=0
         elif name == "sequence":
             self.title = attrs["taxon"]
@@ -115,8 +140,9 @@ f = open("bpp.txt",'w')
 m = open("bpp.map.txt",'w')
 c = open("bpp.ctl",'w')
 
+parse(beast_xml_file,noseqHandler())
 parse(beast_xml_file,dataHandler(sequence))
-parse('examples/testStarBeast.xml',BeastHandler())
+parse(beast_xml_file,BeastHandler())
 c.write("    seed = -1\n")
 c.write("    seqfile = bpp.txt\n")
 c.write("    Imapfile = bpp.map.txt\n")
