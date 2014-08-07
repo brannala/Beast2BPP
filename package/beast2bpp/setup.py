@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='beast2bpp',
-      version='0.12',
+      version='0.13',
       description='Script that converts starBeast xml format input files to BPP format',
       classifiers=[
         'Development Status :: 3 - Alpha',
